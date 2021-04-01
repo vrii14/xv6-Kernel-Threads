@@ -1,3 +1,5 @@
+#define MAXTHREADS 128
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -49,6 +51,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  uint thread_count;          // total threads of process
+  struct proc* procThreads[MAXTHREADS]; //per process threads array
+  void* ustack;                 // user stack for the clone system call
+  uint isThread;
 };
 
 // Process memory is laid out contiguously, low addresses first:

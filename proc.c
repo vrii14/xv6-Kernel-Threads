@@ -174,6 +174,79 @@ growproc(int n)
   return 0;
 }
 
+//Clone system call to create a thread of a process which will be called from 
+//user function thread_create 
+int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *arg2){
+  int i, pid;
+  // cprintf("Initial\n");
+  struct proc *th;
+  struct proc *parentproc = myproc();
+  // cprintf("My Proc\n");
+  if((th = allocproc()) == 0) {
+    return -1;
+  }
+  // cprintf("Alloc Proc\n");
+
+  //thread will have same address space as process
+  th->pgdir = parentproc->pgdir;
+
+  int user_stack[3];
+  uint stack_pointer = (uint)stack + PGSIZE;
+  user_stack[0] = 0xffffffff;
+  user_stack[1] = (uint)arg1;
+  user_stack[2] = (uint)arg2;
+  stack_pointer -= 12;
+  // cprintf("User Stack\n");
+
+  if (copyout(th->pgdir, stack_pointer, user_stack, 12) < 0)
+    return -1;
+  // cprintf("Copyout\n");
+  th->sz = parentproc->sz;
+  //parent of thread 
+  th->parent = parentproc;
+  //threads list and thread count of parent process updated 
+  parentproc->procThreads[parentproc->thread_count++] = th;
+  // cprintf(" basic\n");
+  //trapframe will be the same
+  th->tf = parentproc->tf;
+    // cprintf("Trapframe basic\n");
+
+  //should return 0 on success of thread creation
+  th->tf->eax = 0;
+  th->tf->esp = (uint)stack_pointer;
+  th->tf->ebp = th->tf->esp;
+  //thread will start from the function provided in the argument of clone
+  th->tf->eip = (uint)fcn;
+  // cprintf("Trapframe pointers\n");
+
+  //Temporary 
+  //have to figure out the stack portion
+  th->ustack = stack + PGSIZE - 4; ;
+  // cprintf("User Stack\n");
+
+  //duplicate all the files from the parent process
+  for(i = 0; i < NOFILE; i++)
+    if(parentproc->ofile[i])
+      th->ofile[i] = filedup(parentproc->ofile[i]);
+  th->cwd = idup(parentproc->cwd);
+  // cprintf("Copy files and inode\n");
+
+  safestrcpy(th->name, parentproc->name, sizeof(parentproc->name));
+
+  pid = th->pid;
+
+  acquire(&ptable.lock);
+  th->state = RUNNABLE;
+  release(&ptable.lock);
+
+  th->isThread = 1;
+  // cprintf("Doneee\n");
+  // cprintf("Myproc printing\n");
+  // cprintf("Parent: %d\n", parentproc->tf->cs&3);
+  // cprintf("Thread: %d\n", th->tf->cs&3);
+
+  return pid;
+}
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
@@ -217,6 +290,8 @@ fork(void)
   np->state = RUNNABLE;
 
   release(&ptable.lock);
+
+  np->isThread = 0;
 
   return pid;
 }
