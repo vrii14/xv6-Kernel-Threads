@@ -111,6 +111,7 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+  p->thread_count = 0;
 
   return p;
 }
@@ -178,58 +179,47 @@ growproc(int n)
 //user function thread_create 
 int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *arg2){
   int i, pid;
-  // cprintf("Initial\n");
   struct proc *th;
   struct proc *parentproc = myproc();
-  // cprintf("My Proc\n");
   if((th = allocproc()) == 0) {
     return -1;
   }
-  // cprintf("Alloc Proc\n");
 
   //thread will have same address space as process
   th->pgdir = parentproc->pgdir;
-
-  int user_stack[3];
-  uint stack_pointer = (uint)stack + PGSIZE;
-  user_stack[0] = 0xffffffff;
-  user_stack[1] = (uint)arg1;
-  user_stack[2] = (uint)arg2;
-  stack_pointer -= 12;
-  // cprintf("User Stack\n");
-
-  if (copyout(th->pgdir, stack_pointer, user_stack, 12) < 0)
-    return -1;
-  // cprintf("Copyout\n");
   th->sz = parentproc->sz;
   //parent of thread 
   th->parent = parentproc;
   //threads list and thread count of parent process updated 
   parentproc->procThreads[parentproc->thread_count++] = th;
-  // cprintf(" basic\n");
   //trapframe will be the same
   th->tf = parentproc->tf;
-    // cprintf("Trapframe basic\n");
 
+  int user_stack[3];
+  uint stack_pointer = (uint)stack + PGSIZE;
+  user_stack[2] = 0xffffffff;
+  //user_stack[2] = th->tf->ebp;
+  user_stack[1] = (uint)arg1;
+  user_stack[0] = (uint)arg2;
+  stack_pointer -= 12;
+  if (copyout(th->pgdir, stack_pointer, user_stack, 12) < 0)
+    return -1;
+  
   //should return 0 on success of thread creation
   th->tf->eax = 0;
   th->tf->esp = (uint)stack_pointer;
   th->tf->ebp = th->tf->esp;
   //thread will start from the function provided in the argument of clone
   th->tf->eip = (uint)fcn;
-  // cprintf("Trapframe pointers\n");
+  cprintf("th->tf->eip: %x\n", V2P((char *)(th->tf->eip)));
+  th->ustack = stack;
 
-  //Temporary 
-  //have to figure out the stack portion
-  th->ustack = stack + PGSIZE - 4; ;
-  // cprintf("User Stack\n");
-
+  //Below Code is borrowed from code of fork()
   //duplicate all the files from the parent process
   for(i = 0; i < NOFILE; i++)
     if(parentproc->ofile[i])
       th->ofile[i] = filedup(parentproc->ofile[i]);
   th->cwd = idup(parentproc->cwd);
-  // cprintf("Copy files and inode\n");
 
   safestrcpy(th->name, parentproc->name, sizeof(parentproc->name));
 
@@ -240,12 +230,52 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   release(&ptable.lock);
 
   th->isThread = 1;
-  // cprintf("Doneee\n");
-  // cprintf("Myproc printing\n");
-  // cprintf("Parent: %d\n", parentproc->tf->cs&3);
-  // cprintf("Thread: %d\n", th->tf->cs&3);
 
   return pid;
+}
+
+//temporary similar to wait
+int join(int threadId)
+{
+  struct proc *p;
+  int havekids, pid;
+  struct proc *curproc = myproc();
+  //for finding current running thread
+  // for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  //   if((p->isThread) && (p->pid == threadId)){
+  //     curproc = p;
+  //   }
+  // }
+  
+  acquire(&ptable.lock);
+  for(;;){
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(curproc->parent != p)
+        continue;
+      havekids = 1;
+      if((p->state == ZOMBIE) && (p->isThread)){
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        freevm(p->pgdir);
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+    // No point waiting if we don't have any children.
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
 }
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.

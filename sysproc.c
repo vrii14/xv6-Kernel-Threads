@@ -91,30 +91,32 @@ sys_uptime(void)
 }
 
 
-// int sys_clone(void){
-//   void (*fcn)(void *, void *);
-//   int flags;
-//   void *stack;
-//   void *arg1;
-//   void *arg2;
-  
-//   return clone(fcn, stack, flags, arg1, arg2);
-// }
 int sys_clone(void){
   void (*fcn)(void *, void *);
   void *stack;
   void *arg1;
   void *arg2;
-  int flags = 0;
+  int flags;
   
   if(argptr(0, (void*)&fcn, sizeof(void*)) < 0)
     return -1;
   if(argptr(1, (void*)&arg1, sizeof(void*)) < 0)
     return -1;
-  if(argptr(2, (void*)&arg2, sizeof(void*)) < 0)
+  if(argint(2, &flags) < 0)
     return -1;
-  if(argptr(3, (void*)&stack, sizeof(void*)) < 0)
+  if(argptr(3, (void*)&arg2, sizeof(void*)) < 0)
+    return -1;
+  if(argptr(4, (void*)&stack, sizeof(void*)) < 0)
     return -1;
 
   return clone(fcn, stack,flags, arg1, arg2);
+}
+
+int sys_join(void){
+  int threadId;
+  
+  if(argint(0,&threadId) < 0)
+    return -1;
+  
+  return join(threadId);
 }
