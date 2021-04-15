@@ -243,7 +243,7 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   return pid;
 }
 
-//temporary similar to wait
+//Borrowed some code from wait system call
 int join(int threadId)
 {
   struct proc *p;
@@ -254,44 +254,48 @@ int join(int threadId)
 
   acquire(&ptable.lock);
   for(;;){
-    // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
-        continue;
-      havekids = 1;
+      //Only threads have to wait
+      if(p->isThread){
+        if(p->parent != curproc)
+          continue;
       
-      if(p->state == ZOMBIE && p->pid == threadId){
-        // Found one.
-        pid = p->pid;
-        kfree(p->kstack);
-        p->kstack = 0;
-        //freevm(p->pgdir);
-        p->pid = 0;
-        p->ustack = 0;
-        p->parent = 0;
-        p->name[0] = 0;
-        p->killed = 0;
-        p->state = UNUSED;
-        nextthread_id--;
-        curproc->thread_count--;
-        release(&ptable.lock);
-        return pid;
+        havekids = 1;
+        if(p->state == ZOMBIE && p->pid == threadId){
+          // Found one.
+          pid = p->pid;
+          kfree(p->kstack);
+          p->kstack = 0;
+          //freevm(p->pgdir);
+          //Can't free the pgdir since it shares it 
+          //with the parent proccess. 
+          //Just have to make the child pgdir to null
+          p->pgdir = 0;
+          p->pid = 0;
+          p->ustack = 0;
+          p->parent = 0;
+          p->name[0] = 0;
+          p->killed = 0;
+          p->state = UNUSED;
+          //for gettid()
+          nextthread_id--;
+          curproc->thread_count--;
+          release(&ptable.lock);
+          return pid;
+        }
       }
     }
-
     // No point waiting if we don't have any children.
     if(!havekids || curproc->killed){
       release(&ptable.lock);
       return -1;
     }
-
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
- 
-  
 }
+
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.

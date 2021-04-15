@@ -1,4 +1,4 @@
-#define MAXTHREADS 128
+#define MAXTHREADS 60
 
 // Per-CPU state
 struct cpu {
