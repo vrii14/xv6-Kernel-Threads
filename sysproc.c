@@ -42,6 +42,17 @@ sys_getpid(void)
   return myproc()->pid;
 }
 
+int sys_gettid(void)
+{
+  struct proc *p = myproc();
+  if(p->isThread){
+    return p->thread_id;
+  }
+  else{
+    return -1;
+  }
+}
+
 int
 sys_sbrk(void)
 {
@@ -100,13 +111,13 @@ int sys_clone(void){
   
   if(argptr(0, (void*)&fcn, sizeof(void*)) < 0)
     return -1;
-  if(argptr(1, (void*)&arg1, sizeof(void*)) < 0)
+  if(argptr(1, (void*)&stack, sizeof(void*)) < 0)
     return -1;
   if(argint(2, &flags) < 0)
     return -1;
-  if(argptr(3, (void*)&arg2, sizeof(void*)) < 0)
+  if(argptr(3, (void*)&arg1, sizeof(void*)) < 0)
     return -1;
-  if(argptr(4, (void*)&stack, sizeof(void*)) < 0)
+  if(argptr(4, (void*)&arg2, sizeof(void*)) < 0)
     return -1;
 
   return clone(fcn, stack,flags, arg1, arg2);

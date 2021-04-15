@@ -8,33 +8,93 @@
 #include "proc.h"
 #include "spinlock.h"
 
-void do_something(void *arg1, void*arg2){
-        printf(1, "Child pid : %d %c\n", arg1, arg2);
+
+
+void do_something(void *arg1, void *arg2){
+        // int pid=getpid();
+        // printf(1, "Child pid : %d\n", pid);
+        // printf(1, "first: %s\n", arg1);
+        // printf(1, "second: %s\n", arg2);
+        printf(1, "%d\n", gettid());
         exit();
 }
+
+void do_anything(void *arg1, void *arg2){
+        printf(1, "Helloooo\n");
+        exit();
+}
+
+
 int main() {
-        void *stack = malloc(KSTACKSIZE);    // Stack for new process
-        //void *arg1 = malloc(1024);
-        //void *arg2 = malloc(1024);
+
+        printf(1, "Clone test\n");
+        //int child_pid;
+        int thread_id[3];
+        //int pid;
+        // void *stack = malloc(KSTACKSIZE);    // Stack for new process
+        // void *stack2 = malloc(KSTACKSIZE);
+        void *arg1 = malloc(1024);
+        void *arg2 = malloc(1024);
+        strcpy(arg1, "hello");
+        strcpy(arg2, "world");
         int flag = 0;
-        int arg1 = 10;
-        char arg2 = 'a';
-        printf(1, "Malloc done\n");
-        if(!stack) {
-                printf(2,"Malloc Failed");
-                exit();
+        void *stack;
+
+        
+        
+        for(int i=0; i<3; i++){
+                stack = malloc(5000);
+
+                if(!stack) {
+                        printf(2,"Malloc Failed");
+                        exit();
+                }
+
+                thread_id[i] = clone( &do_something, stack, flag, arg1, arg2);
+                if (thread_id[i] < 0){
+                        printf(2,"Clone Failed");
+                        exit(); 
+                }
+                
+                sleep(2);
+                free(stack);
         }
-        // if(clone( &do_something, stack, flag, arg1, arg2) < 0 ){
+
+        for(int i=0;i<3;i++){
+                join(thread_id[i]);
+        }
+
+        
+        // child_pid1 = clone( &do_something, stack, flag, arg1, arg2);
+        // if (child_pid1 < 0){
         //         printf(2,"Clone Failed");
-        //         exit();
+        //         exit(); 
         // }
-        if(!clone( &do_something, stack, flag, (void *)arg1, (void *)&arg2)){
-                printf(1, "try\n");
-        }
-        wait();
-        // printf(1, "pid: %d\n", pid);
-        printf(1,"Parent pid : 10\n");
-        sleep(1);       // Add sleep so we can she both processes output
-        free(stack);
+
+        
+        // sleep(5);
+
+        // child_pid2 = clone( &do_anything, stack2, flag, arg1, arg2);
+        // if (child_pid2 < 0){
+        //         printf(2,"Clone Failed");
+        //         exit(); 
+        // }
+        
+        // sleep(5);
+
+        // printf(1, "%d\n", child_pid1);
+
+        // join(child_pid1);
+
+        // sleep(5);
+        
+        // printf(1, "%d\n", child_pid2);
+
+        
+        // join(child_pid2);
+
+        // printf(1, "Clone test OK\n");
+        // 
+        
         exit();
 }
