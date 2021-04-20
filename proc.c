@@ -15,7 +15,7 @@ struct {
 static struct proc *initproc;
 
 int nextpid = 1;
-int nextthread_id = 1;
+int nextthread_id = 0;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -192,7 +192,7 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   if(((int)stack % PGSIZE) != 0){
     stack = (void*)PGROUNDUP((uint)stack);
   } 
-
+  th->thread_id = ++nextthread_id;
   //thread will have same address space as process
   th->pgdir = parentproc->pgdir;
   int user_stack[3];
@@ -238,7 +238,6 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   release(&ptable.lock);
   
   th->isThread = 1;
-  th->thread_id = nextthread_id++;
 
   return pid;
 }
@@ -248,9 +247,10 @@ int join(int threadId)
 {
   struct proc *p;
   int havekids, pid;
-  struct proc *curproc = myproc();
-  
-  cprintf("threadcount: %d\n", curproc->thread_count);
+  struct proc *curproc = myproc();  
+  // cprintf("threadcount: %d\n", curproc->thread_count);
+  // cprintf("threadid: %d\n", curproc->thread_id);
+  // cprintf("id: %d\n", threadId);
 
   acquire(&ptable.lock);
   for(;;){
@@ -281,6 +281,8 @@ int join(int threadId)
           //for gettid()
           nextthread_id--;
           curproc->thread_count--;
+          // cprintf("If zombie: %d\n", nextthread_id);
+
           release(&ptable.lock);
           return pid;
         }
