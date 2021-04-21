@@ -97,13 +97,41 @@ void doubleClone(){
         thread_join(thread_id);
         printf(1, "Nested test passed\n");
 }
-int main(int argc, char *argv[]) {
 
+void stacktest(){
+        printf(1, "Stack test starting\n");
+        int arg1 = 10;
+        int arg2 = 20;
+        int flag = 0;
+        void *stack;
+        stack =  malloc(4096);
+        if(!stack) {
+                printf(2,"Malloc Failed");
+                printf(2,"Stack test failed");
+                exit();
+        }
+        int thread_id = clone(&do_something, stack, flag, (void *)arg1, (void *)arg2);
+        if (thread_id == -1){
+                printf(2,"%d\n", thread_id);
+                printf(2,"Clone Failed");
+                printf(2,"Stack test failed");
+                exit(); 
+        }
+        sleep(2);
+        join(thread_id);
+        printf(1, "Stack test passed\n");
+}
+
+int main(int argc, char *argv[]) {
+        threadTableInit();
+        
         printf(1, "Clone test starting\n");
         
-        stresstest();
         jointest();
         doubleClone();
+        stacktest();
+        stresstest();
+
         printf(1, "Clone test OK\n");
 
         exit();

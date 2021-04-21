@@ -190,8 +190,9 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
     return -1;
   }
   if(((int)stack % PGSIZE) != 0){
-    stack = (void*)PGROUNDUP((uint)stack);
+    stack = (void*)PGROUNDDOWN((uint)stack);
   } 
+  cprintf("stack: %d\n", stack);
   th->thread_id = ++nextthread_id;
   //thread will have same address space as process
   th->pgdir = parentproc->pgdir;
@@ -225,8 +226,8 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   //Below Code is borrowed from code of fork()
   //duplicate all the files from the parent process
   for(i = 0; i < NOFILE; i++)
-  if(parentproc->ofile[i])
-  th->ofile[i] = filedup(parentproc->ofile[i]);
+    if(parentproc->ofile[i])
+      th->ofile[i] = filedup(parentproc->ofile[i]);
   th->cwd = idup(parentproc->cwd);
   
   safestrcpy(th->name, parentproc->name, sizeof(parentproc->name));
