@@ -1,9 +1,8 @@
-struct thread_table {
-    uint present;
+struct pthread
+{
     uint threadId;
     void *stack;
 };
 
-void threadTableInit();
-int thread_create(void (*)(void *, void *), int, void *, void *);
-int thread_join(int);
+int thread_create(struct pthread *, void (*)(void *, void *), int, void *, void *);
+int thread_join(struct pthread *);

@@ -192,7 +192,7 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   if(((int)stack % PGSIZE) != 0){
     stack = (void*)PGROUNDDOWN((uint)stack);
   } 
-  cprintf("stack: %d\n", stack);
+  // cprintf("stack: %d\n", stack);
   th->thread_id = ++nextthread_id;
   //thread will have same address space as process
   th->pgdir = parentproc->pgdir;
