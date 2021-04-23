@@ -9,15 +9,22 @@
 #include "spinlock.h"
 #include "thread.h"
 #include "fcntl.h"
-int fd;
 void do_something(void *arg1, void *arg2){
-        printf(1, "In do_something ThreadId: %d\n", gettid());
+        // printf(1, "In do_something ThreadId: %d\n", gettid());
+        sleep(2);
         exit();
 }
 
 void fileTestFn(void *arg1, void *arg2){
-        // int fd = *((int *)arg1);
-        printf(1, "In filetestfn: fd=%d\n", fd);
+        int fd = *((int *)arg1);
+        char ch;
+        int n;
+        n = read(fd, &ch, 1);
+        if(n<0){
+                printf(2, "Read error\n");
+        }else{
+                printf(1, "Inside Thread, ch: %c\n", ch);
+        }  
         close(fd);
         sleep(2);
         exit();
@@ -25,18 +32,26 @@ void fileTestFn(void *arg1, void *arg2){
 
 void fileTest(){
         printf(1, "File test starting\n");
+        int fd;
         fd = open("README", O_RDONLY);
-                printf(1, "In fileTest: fd=%d\n", fd);
-
+       
         if(fd == -1){
                 printf(2, "Open failed\n Filetest failed.\n");
                 exit();
         }
+        char ch;
+        int n;
+        n = read(fd, &ch, 1);
+        if(n<0){
+                printf(2, "Read error\n");
+        }else{
+                printf(1, "Before Thread, ch: %c\n", ch);
+        }   
         struct pthread thread;
-        int arg1 = 10;
+        int arg1 = fd;
         int arg2 = 20;
         int flag = 0;
-        int thread_id = thread_create(&thread, &fileTestFn, flag, (void *)arg1, (void *)arg2);
+        int thread_id = thread_create(&thread, &fileTestFn, flag, (void *)&arg1, (void *)arg2);
         if (thread_id == -1){
                 printf(2,"%d\n", thread_id);
                 printf(2,"Clone Failed");
@@ -48,23 +63,17 @@ void fileTest(){
                 printf(2, "File test failed\n");
                 exit();
         }
-                        printf(1, "In fileTest after thread: fd=%d\n", fd);
-
-        char ch;
-        int n = read(fd, &ch, 1);
+        n = read(fd, &ch, 1);
         if(n<0){
                 printf(2, "Read error\n");
-                printf(1, "File test passed\n");
         }else{
-                printf(1, "ch: %c\n", ch);
-                printf(2, "File test failed\n");
-                exit();
+                printf(1, "After thread: ch: %c\n", ch);
+                printf(1, "File Test passed.\n");
         }     
 }
 
 void join_test(void *arg1, void *arg2){
-        printf(1, "first: %s\n", arg1);
-        printf(1, "second: %s\n", arg2);
+        printf(1, "first: %s,  second: %s\n", arg1, arg2);
         printf(1, "ThreadId: %d\n", gettid());
         exit();
 }
@@ -155,7 +164,6 @@ void concurrencyTest(){
         thread_id[1] = thread_create(&threads[1], &concurrentFnTwo, flag, (void *)&arg1, (void *)&arg2);
 
         if ((thread_id[0] == -1) || (thread_id[1] == -1)){
-                // printf(2,"%d\n", thread_id[0]);
                 printf(2,"Clone Failed");
                 printf(2,"Concurrency test failed");
                 exit(); 
@@ -217,7 +225,7 @@ void clone_test(void *arg1, void *arg2){
 }
 
 void doubleClone(){
-        printf(1, "Nested test starting\n");
+        printf(1, "Double Clone test starting\n");
         struct pthread thread;
         int arg1 = 10;
         int arg2 = 20;
@@ -226,15 +234,15 @@ void doubleClone(){
         if (thread_id == -1){
                 printf(2,"%d\n", thread_id);
                 printf(2,"Clone Failed");
-                printf(2,"Nested test failed");
+                printf(2,"Double Clone test failed");
                 exit(); 
         }
         sleep(5);
         if(thread_join(&thread) != thread_id){
-                printf(2, "Nested test failed\n");
+                printf(2, "Double Clone test failed\n");
                 exit();
         }
-        printf(1, "Nested test passed\n");
+        printf(1, "Double Clone test passed\n");
 }
 
 void stacktest(){
@@ -269,7 +277,7 @@ int main(int argc, char *argv[]) {
         stacktest();
         swaptest();
         concurrencyTest();
-        //fileTest();
+        fileTest();
         stresstest();
 
         printf(1, "Clone test OK\n");
