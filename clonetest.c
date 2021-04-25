@@ -9,6 +9,62 @@
 #include "spinlock.h"
 #include "thread.h"
 #include "fcntl.h"
+
+int matA[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+int matB[3][3] = {{10, 11, 12}, {13, 14, 15}, {16, 17, 18}};
+int matC[3][3];
+int matCount = -1;
+
+void matrixThread(void *arg1, void *arg2){
+        matCount++;
+        int i, j, k;
+	for (i = matCount; i < (matCount + 1); i++)
+	{
+		for (j = 0; j < 3; j++)
+		{
+			for (k = 0; k < 3; k++)
+			{
+				matC[i][j] += matA[i][k] * matB[k][j];
+			}
+		}
+	}
+        exit();
+}
+
+void matrixMultiplication(){
+        printf(1, "Matrix Multiplication test starting\n");
+        struct pthread threads[3] ;
+        int thread_id[3];
+        int arg1 = 10;
+        int arg2 = 20;
+        int flag = 0;
+        for(int i=0; i<3; i++){
+                thread_id[i] = thread_create(&threads[i] , &matrixThread, flag, (void *)arg1, (void *)arg2);
+                if (thread_id[i] == -1){
+                        printf(2,"%d\n", thread_id[i]);
+                        printf(2,"Clone Failed");
+                        printf(2,"Matrix Multiplication test failed");
+                        exit(); 
+                }
+                sleep(5);
+        }
+        for(int i=0;i< 3;i++){
+                if(thread_join(&threads[i]) != thread_id[i]){
+                        printf(2, "Matrix Multiplication test failed\n");
+                        exit();
+                }
+        }
+        for (int i = 0; i < 3; i++)
+        {
+                for (int j = 0; j < 3; j++)
+                {
+                        printf(1, "%d  ", matC[i][j]);
+                }
+                printf(1, "\n");
+        }
+        printf(1, "Matrix Multiplication test passed\n");
+}
+
 void do_something(void *arg1, void *arg2){
         // printf(1, "In do_something ThreadId: %d\n", gettid());
         sleep(2);
@@ -178,8 +234,8 @@ void concurrencyTest(){
         printf(1, "Concurrency test passed\n");
 }
 
-void stresstest(){
-        printf(1, "Stress test starting\n");
+void stresstestone(){
+        printf(1, "Stress test one starting\n");
         struct pthread threads[MAXTHREADS] ;
         int thread_id[MAXTHREADS];
         void *arg1 = malloc(1024);
@@ -193,7 +249,7 @@ void stresstest(){
                 if (thread_id[i] == -1){
                         printf(2,"%d\n", thread_id[i]);
                         printf(2,"Clone Failed");
-                        printf(2,"Stress test failed");
+                        printf(2,"Stress test onefailed");
                         exit(); 
                 }
                 sleep(2);
@@ -201,12 +257,44 @@ void stresstest(){
         int i;
         for(i=0;i<num;i++){
                 if(thread_join(&threads[i]) != thread_id[i]){
-                        printf(2, "Stress test failed\n");
+                        printf(2, "Stress test one failed\n");
                         exit();
                 }
         }
         if(i == num){
-                printf(1, "Stress test passed\n");
+                printf(1, "Stress test one passed\n");
+        }
+}
+
+void stresstesttwo(){
+        printf(1, "Stress test two starting\n");
+        struct pthread threads[100] ;
+        int thread_id[100];
+        void *arg1 = malloc(1024);
+        void *arg2 = malloc(1024);
+        strcpy(arg1, "hello");
+        strcpy(arg2, "world");
+        int flag = 0;
+        int count = 0;
+        for(int i=0; i<100; i++){
+                thread_id[i] = thread_create(&threads[i], &do_something, flag, arg1, arg2);
+                if (thread_id[i] == -1){
+                        // printf(2,"%d\n", thread_id[i]);
+                        printf(2,"Clone Failed\n");
+                        break;
+                }
+                count++;
+                sleep(2);
+        }
+        int i;
+        for(i=0;i<count;i++){
+                if(thread_join(&threads[i]) != thread_id[i]){
+                        printf(2, "Stress test two failed\n");
+                        exit();
+                }
+        }
+        if(i == count){
+                printf(1, "Stress test two passed\n");
         }
 }
 
@@ -278,7 +366,9 @@ int main(int argc, char *argv[]) {
         swaptest();
         concurrencyTest();
         fileTest();
-        stresstest();
+        matrixMultiplication();
+        stresstestone();
+        stresstesttwo();
 
         printf(1, "Clone test OK\n");
 
