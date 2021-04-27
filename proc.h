@@ -1,4 +1,9 @@
 #define MAXTHREADS 60
+#define CLONE_VM 2
+#define CLONE_FILES 4
+#define CLONE_FS 8
+#define CLONE_PARENT 16
+#define CLONE_THREAD 32
 
 // Per-CPU state
 struct cpu {
@@ -35,7 +40,7 @@ struct context {
 };
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
-
+//extra: vlock, count, tgid, process
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)

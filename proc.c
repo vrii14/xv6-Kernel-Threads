@@ -182,20 +182,82 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   int i, pid;
   struct proc *th;
   struct proc *parentproc = myproc();
+  int vmFlag = 0, filesFlag = 0, fsFlag = 0, parentFlag = 0, threadFlag = 0;  
   if((th = allocproc()) == 0) {
     return -1;
   }
 
-  if(parentproc->thread_count > MAXTHREADS){
+  if(parentproc->sz < (int)stack){
+    kfree(th->kstack);
+    th->kstack = 0;
+    th->state = UNUSED;
     return -1;
   }
+
+  if(parentproc->thread_count > MAXTHREADS){
+    kfree(th->kstack);
+    th->kstack = 0;
+    th->state = UNUSED;
+    return -1;
+  }
+
   if(((int)stack % PGSIZE) != 0){
     stack = (void*)PGROUNDDOWN((uint)stack);
   } 
-  // cprintf("stack: %d\n", stack);
+  switch (flags)
+  {
+  case 2:
+    vmFlag = 1;
+    break;
+  case 4:
+    filesFlag = 1;
+    break;
+  case 6:
+    vmFlag = 1;
+    filesFlag = 1;
+    break;
+  case 8:
+    fsFlag = 1;
+    break;
+  case 10:
+    fsFlag = 1;
+    vmFlag = 1;
+    break;
+  case 14:
+    vmFlag = 1;
+    fsFlag = 1;
+    filesFlag = 1;
+    break;
+  case 16:
+    parentFlag = 1;
+    break;
+  case 18:
+    vmFlag = 1;
+    parentFlag = 1;
+    break;
+  case 32:
+    threadFlag = 1;
+    break;
+  case 34:
+    vmFlag = 1;
+    threadFlag = 1;
+    break;
+  }
+  cprintf("%d%d%d\n", fsFlag, parentFlag, threadFlag);
   th->thread_id = ++nextthread_id;
   //thread will have same address space as process
-  th->pgdir = parentproc->pgdir;
+
+  if(vmFlag == 1){
+    th->pgdir = parentproc->pgdir;
+  }else{
+    if((th->pgdir = copyuvm(parentproc->pgdir, parentproc->sz)) == 0){
+      kfree(th->kstack);
+      th->kstack = 0;
+      th->state = UNUSED;
+      return -1;
+    }
+  }
+
   int user_stack[3];
 
   uint stack_pointer = (uint)stack + PGSIZE;
@@ -225,9 +287,16 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   
   //Below Code is borrowed from code of fork()
   //duplicate all the files from the parent process
-  for(i = 0; i < NOFILE; i++)
-    if(parentproc->ofile[i])
-      th->ofile[i] = filedup(parentproc->ofile[i]);
+  for(i = 0; i < NOFILE; i++){
+    if(parentproc->ofile[i]){
+      if(filesFlag == 1){
+        th->ofile[i] = parentproc->ofile[i];
+      }else{
+        th->ofile[i] = filedup(parentproc->ofile[i]);        
+      }
+    }
+  }
+    
   th->cwd = idup(parentproc->cwd);
   
   safestrcpy(th->name, parentproc->name, sizeof(parentproc->name));
