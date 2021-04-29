@@ -123,6 +123,7 @@ void            yield(void);
 int             clone(void(*)(void *, void *), void *, int, void *, void *);
 int             join(int);
 int             gettid();
+int             tgkill(int, int, int);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -191,3 +192,4 @@ void            clearpteu(pde_t *pgdir, char *uva);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+

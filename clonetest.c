@@ -388,6 +388,137 @@ void stacktest(){
         printf(1, "Stack test passed\n");
 }
 
+void func_tgkill(void *arg1, void *arg2){
+        
+        sleep(2);
+        exit();
+}
+
+void tgkilltest(){
+        printf(1, "tgkill test starting\n");
+
+        int arg1 = 10;
+        int arg2 = 20;
+        void *stack;
+        stack =  malloc(4096);
+        if(!stack) {
+                printf(2,"Malloc Failed");
+                exit();
+        }
+        int thread_id = clone(&func_tgkill, stack, 0, (void *)arg1, (void *)arg2);
+        if (thread_id == -1){
+                printf(2,"Clone Failed");
+                exit(); 
+        }
+        sleep(5);
+        int tgid = getpid();
+       
+        if(tgkill(tgid, thread_id, 0) == -1)
+                printf(2, "tgkill test failed\n");
+
+        join(thread_id);
+        printf(1, "tgkill test passed\n");
+
+
+}
+
+int global_value = 0;
+char *heap;
+
+void vm_func(void *arg1, void*arg2)
+{
+	
+	printf(1, "Child sees global value = %d\n", global_value);
+	global_value = 10;
+	strcpy(heap, "bye");
+        exit();
+}
+
+void vmflagtest(){
+        printf(1, "VM Flag test starting\n");
+
+
+        char *stack = malloc(4096);
+	char buf[256];
+        int arg2 = 20;
+
+
+	if (!stack) {
+                printf(2,"Malloc Failed");
+		exit();
+	}
+	heap = malloc(1024);
+	if (!heap) {
+                printf(2,"Malloc Failed");
+		exit();
+	}
+	
+	strcpy(buf, "Hello from Parent");
+	strcpy(heap, "Hey");
+	global_value = 5;
+        int pid = clone(&vm_func, stack, CLONE_VM, (void *)buf, (void *)arg2);
+	if ( pid== -1) {
+                printf(2,"Clone Failed");
+		exit();
+	}
+
+        join(pid);
+
+	printf(1, "global_value=%d\n", global_value);
+
+        printf(1, "VM Flag test passed\n");
+
+
+}
+
+int fd2;
+
+void files_func(void *arg1, void *arg2)
+{
+	close(fd2);
+        exit();
+}
+
+void filesflagtest(){
+        printf(1, "Files Flag test starting\n");
+
+        char *stack = malloc(4096);
+	char buf[256];
+        int arg2 = 20;
+        int status;
+
+	fd2 = open("README", O_RDWR);
+	if (fd2 == -1) {
+                printf(2,"Open Failed");
+		exit();
+	}
+	if (!stack) {
+                printf(2,"Malloc Failed");
+		exit();
+	}
+
+        int pid = clone(&files_func, stack, CLONE_VM | CLONE_FILES, (void *)buf, (void *)arg2);
+	if ( pid== -1) {
+                printf(2,"Clone Failed");
+		exit();
+	}
+
+        join(pid);
+
+	status = read(fd2, buf, 5);
+	if (status < 0) {
+                printf(2,"Read Failed");
+                printf(1, "Files Flag test passed\n");
+		exit();
+	}
+	printf(1, "Parent read:%s\n", buf);
+	close(fd2);
+
+        printf(1, "Files Flag test passed\n");
+
+}
+
+
 int main(int argc, char *argv[]) {
         printf(1, "Clone test starting\n");
         
@@ -401,7 +532,11 @@ int main(int argc, char *argv[]) {
         forkInClone();
         stresstestone();
         stresstesttwo();
+        tgkilltest();
+        vmflagtest();
+        // filesflagtest();
 
+        
         printf(1, "Clone test OK\n");
 
         exit();

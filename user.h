@@ -26,6 +26,7 @@ int uptime(void);
 int clone(void(*)(void *, void *), void *, int, void *, void *);
 int join(int);
 int gettid(void);
+int tgkill(int, int, int);
 
 // ulib.c
 int stat(const char*, struct stat*);

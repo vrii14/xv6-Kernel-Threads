@@ -27,6 +27,21 @@ sys_wait(void)
 }
 
 int
+sys_tgkill(void){
+  int tgid, tid, sig;
+
+  if(argint(0, &tgid) < 0)
+    return -1;
+  if(argint(1, &tid) < 0)
+    return -1;
+  if(argint(2, &sig) < 0)
+    return -1;
+
+  return tgkill(tgid, tid, sig);
+}
+
+
+int
 sys_kill(void)
 {
   int pid;
@@ -39,7 +54,7 @@ sys_kill(void)
 int
 sys_getpid(void)
 {
-  return myproc()->pid;
+  return myproc()->tgid;
 }
 
 int sys_gettid(void)

@@ -182,72 +182,35 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   int i, pid;
   struct proc *th;
   struct proc *parentproc = myproc();
-  int vmFlag = 0, filesFlag = 0, fsFlag = 0, parentFlag = 0, threadFlag = 0;  
   if((th = allocproc()) == 0) {
     return -1;
   }
 
-  if(parentproc->sz < (int)stack){
-    kfree(th->kstack);
-    th->kstack = 0;
-    th->state = UNUSED;
-    return -1;
-  }
-
   if(parentproc->thread_count > MAXTHREADS){
-    kfree(th->kstack);
-    th->kstack = 0;
-    th->state = UNUSED;
     return -1;
   }
-
   if(((int)stack % PGSIZE) != 0){
     stack = (void*)PGROUNDDOWN((uint)stack);
   } 
-  switch (flags)
-  {
-  case 2:
-    vmFlag = 1;
-    break;
-  case 4:
-    filesFlag = 1;
-    break;
-  case 6:
-    vmFlag = 1;
-    filesFlag = 1;
-    break;
-  case 8:
-    fsFlag = 1;
-    break;
-  case 10:
-    fsFlag = 1;
-    vmFlag = 1;
-    break;
-  case 14:
-    vmFlag = 1;
-    fsFlag = 1;
-    filesFlag = 1;
-    break;
-  case 16:
-    parentFlag = 1;
-    break;
-  case 18:
-    vmFlag = 1;
-    parentFlag = 1;
-    break;
-  case 32:
-    threadFlag = 1;
-    break;
-  case 34:
-    vmFlag = 1;
-    threadFlag = 1;
-    break;
-  }
-  cprintf("%d%d%d\n", fsFlag, parentFlag, threadFlag);
-  th->thread_id = ++nextthread_id;
-  //thread will have same address space as process
 
-  if(vmFlag == 1){
+
+  th->thread_id = ++nextthread_id;
+
+  //Thread group id of child will be parent process pid
+  th->tgid = parentproc->pid;
+  // if(th->flag == 32)
+  //   th->tgid = parentproc->pid;
+  // else
+  //   th->tgid = th->thread_id;
+
+
+  // cprintf("flags: %d\n", flags);
+  th->flag |= flags;
+  // cprintf("th->flag: %d\n", th->flag);
+
+
+  //thread will have same address space as process
+  if(th->flag == 2){
     th->pgdir = parentproc->pgdir;
   }else{
     if((th->pgdir = copyuvm(parentproc->pgdir, parentproc->sz)) == 0){
@@ -271,7 +234,15 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
 
   th->sz = parentproc->sz;
   //parent of thread 
-  th->parent = parentproc;
+  // th->parent = parentproc;
+
+  if(th->flag == 16){
+    th->parent = parentproc->parent;
+  }
+  else{
+    th->parent = parentproc; 
+  }
+
   //threads list and thread count of parent process updated 
   //parentproc->procThreads[parentproc->thread_count++] = th;
   //trapframe will be the same
@@ -285,27 +256,28 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   th->tf->eip = (uint)fcn;
   th->ustack = stack;
   
+
   //Below Code is borrowed from code of fork()
   //duplicate all the files from the parent process
   for(i = 0; i < NOFILE; i++){
     if(parentproc->ofile[i]){
-      if(filesFlag == 1){
+      if(th->flag == 4 || th->flag == 6){
         th->ofile[i] = parentproc->ofile[i];
       }else{
         th->ofile[i] = filedup(parentproc->ofile[i]);        
       }
     }
   }
-    
+
   th->cwd = idup(parentproc->cwd);
   
   safestrcpy(th->name, parentproc->name, sizeof(parentproc->name));
   
   pid = th->pid;
   
-  acquire(&ptable.lock);
+  // acquire(&ptable.lock);
   th->state = RUNNABLE;
-  release(&ptable.lock);
+  // release(&ptable.lock);
   
   th->isThread = 1;
 
@@ -405,6 +377,9 @@ fork(void)
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
+
+  //tgid for gtpid function
+  np->tgid = np->pid;
 
   acquire(&ptable.lock);
 
@@ -693,6 +668,25 @@ kill(int pid)
   return -1;
 }
 
+
+int tgkill(int tgid, int tid, int sig){
+  struct proc *p; 
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->pid == tid && p->tgid == tgid){
+        p->killed = 1;
+        // Wake process from sleep if necessary.
+        if(p->state == SLEEPING)
+          p->state = RUNNABLE;
+        return 0;
+      }
+    
+  }
+
+  return -1;
+
+}
+
 //PAGEBREAK: 36
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.
@@ -729,3 +723,4 @@ procdump(void)
     cprintf("\n");
   }
 }
+

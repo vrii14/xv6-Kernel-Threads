@@ -5,6 +5,7 @@
 #define CLONE_PARENT 16
 #define CLONE_THREAD 32
 
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -40,7 +41,7 @@ struct context {
 };
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
-//extra: vlock, count, tgid, process
+
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
@@ -48,6 +49,7 @@ struct proc {
   char *kstack;                // Bottom of kernel stack for this process
   enum procstate state;        // Process state
   int pid;                     // Process ID
+  int tgid;                    // Thread Group ID
   struct proc *parent;         // Parent process
   struct trapframe *tf;        // Trap frame for current syscall
   struct context *context;     // swtch() here to run process
@@ -57,6 +59,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   uint thread_count;          // total threads of process
+  int flag;
   //struct proc* procThreads[MAXTHREADS]; //per process threads array
   void* ustack;                 // user stack for the clone system call
   uint isThread;
@@ -68,3 +71,4 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
