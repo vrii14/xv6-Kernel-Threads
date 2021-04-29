@@ -140,6 +140,8 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+  p->tgid = p->pid;
+  p->isThread = 0;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -197,20 +199,19 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   th->thread_id = ++nextthread_id;
 
   //Thread group id of child will be parent process pid
-  th->tgid = parentproc->pid;
-  // if(th->flag == 32)
-  //   th->tgid = parentproc->pid;
-  // else
-  //   th->tgid = th->thread_id;
-
-
-  // cprintf("flags: %d\n", flags);
-  th->flag |= flags;
-  // cprintf("th->flag: %d\n", th->flag);
-
+  // th->tgid = parentproc->pid;
+  if(flags & CLONE_THREAD){
+    th->tgid = parentproc->pid;
+    th->threadFlag = 1;
+  }
+  else{
+    th->tgid = th->thread_id;
+  }
 
   //thread will have same address space as process
-  if(th->flag == 2){
+
+  if(flags & CLONE_VM){
+    th->vmFlag = 1;
     th->pgdir = parentproc->pgdir;
   }else{
     if((th->pgdir = copyuvm(parentproc->pgdir, parentproc->sz)) == 0){
@@ -219,6 +220,13 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
       th->state = UNUSED;
       return -1;
     }
+  }
+
+  if(flags & CLONE_PARENT){
+    th->parentFlag = 1;
+    th->parent = parentproc->parent;
+  }else{
+    th->parent = parentproc; 
   }
 
   int user_stack[3];
@@ -236,12 +244,6 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   //parent of thread 
   // th->parent = parentproc;
 
-  if(th->flag == 16){
-    th->parent = parentproc->parent;
-  }
-  else{
-    th->parent = parentproc; 
-  }
 
   //threads list and thread count of parent process updated 
   //parentproc->procThreads[parentproc->thread_count++] = th;
@@ -261,7 +263,8 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   //duplicate all the files from the parent process
   for(i = 0; i < NOFILE; i++){
     if(parentproc->ofile[i]){
-      if(th->flag == 4 || th->flag == 6){
+      if(flags & CLONE_FILES){
+        th->fileFlag = 1;
         th->ofile[i] = parentproc->ofile[i];
       }else{
         th->ofile[i] = filedup(parentproc->ofile[i]);        
@@ -300,8 +303,13 @@ int join(int threadId)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       //Only threads have to wait
       if(p->isThread){
-        if(p->parent != curproc)
-          continue;
+        if(p->parentFlag){
+          if(p->parent != curproc->parent)
+            continue;
+        }else{
+          if(p->parent != curproc)
+            continue;
+        }
       
         havekids = 1;
         if(p->state == ZOMBIE && p->pid == threadId){
@@ -673,7 +681,7 @@ int tgkill(int tgid, int tid, int sig){
   struct proc *p; 
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->pid == tid && p->tgid == tgid){
+      if(p->thread_id == tid && p->tgid == tgid){
         p->killed = 1;
         // Wake process from sleep if necessary.
         if(p->state == SLEEPING)

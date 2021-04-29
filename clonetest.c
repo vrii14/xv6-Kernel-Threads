@@ -39,7 +39,7 @@ void matrixMultiplication(){
         int arg2 = 20;
         // int flag = 0;
         for(int i=0; i<3; i++){
-                thread_id[i] = thread_create(&threads[i] , &matrixThread, CLONE_VM, (void *)arg1, (void *)arg2);
+                thread_id[i] = thread_create(&threads[i] , &matrixThread, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
                 if (thread_id[i] == -1){
                         printf(2,"%d\n", thread_id[i]);
                         printf(2,"Clone Failed");
@@ -107,7 +107,7 @@ void fileTest(){
         int arg1 = fd;
         int arg2 = 20;
         // int flag = 0;
-        int thread_id = thread_create(&thread, &fileTestFn, CLONE_VM , (void *)&arg1, (void *)arg2);
+        int thread_id = thread_create(&thread, &fileTestFn, CLONE_VM | CLONE_THREAD, (void *)&arg1, (void *)arg2);
         if (thread_id == -1){
                 printf(2,"%d\n", thread_id);
                 printf(2,"Clone Failed");
@@ -144,7 +144,7 @@ void jointest(){
         strcpy(arg2, "world");
         // int flag = 0;
         for(int i=0; i<3; i++){
-                thread_id[i] = thread_create(&threads[i] , &join_test, CLONE_VM, arg1, arg2);
+                thread_id[i] = thread_create(&threads[i] , &join_test, CLONE_VM | CLONE_THREAD, arg1, arg2);
                 if (thread_id[i] == -1){
                         printf(2,"%d\n", thread_id[i]);
                         printf(2,"Clone Failed");
@@ -181,7 +181,7 @@ void swaptest(){
         int arg2 = 20;
         printf(1,"In swap test before thread, arg1: %d, arg2: %d\n", arg1, arg2);
         // int flag = 0;
-        int thread_id = thread_create(&thread, &swapTestfn, CLONE_VM, (void *)&arg1, (void *)&arg2);
+        int thread_id = thread_create(&thread, &swapTestfn, CLONE_VM | CLONE_THREAD, (void *)&arg1, (void *)&arg2);
         if (thread_id == -1){
                 printf(2,"%d\n", thread_id);
                 printf(2,"Clone Failed");
@@ -216,8 +216,8 @@ void concurrencyTest(){
         int arg1 = 200;
         int arg2 = 50;
         // int flag = 0;
-        thread_id[0] = thread_create(&threads[0], &concurrentFnOne, CLONE_VM, (void *)&arg1, (void *)&arg2);
-        thread_id[1] = thread_create(&threads[1], &concurrentFnTwo, CLONE_VM, (void *)&arg1, (void *)&arg2);
+        thread_id[0] = thread_create(&threads[0], &concurrentFnOne, CLONE_VM | CLONE_THREAD, (void *)&arg1, (void *)&arg2);
+        thread_id[1] = thread_create(&threads[1], &concurrentFnTwo, CLONE_VM | CLONE_THREAD, (void *)&arg1, (void *)&arg2);
 
         if ((thread_id[0] == -1) || (thread_id[1] == -1)){
                 printf(2,"Clone Failed");
@@ -245,7 +245,7 @@ void stresstestone(){
         // int flag = 0;
         int num = MAXTHREADS;
         for(int i=0; i<num; i++){
-                thread_id[i] = thread_create(&threads[i], &do_something, CLONE_VM, arg1, arg2);
+                thread_id[i] = thread_create(&threads[i], &do_something, CLONE_VM | CLONE_THREAD, arg1, arg2);
                 if (thread_id[i] == -1){
                         printf(2,"%d\n", thread_id[i]);
                         printf(2,"Clone Failed");
@@ -276,7 +276,7 @@ void stresstesttwo(){
         strcpy(arg2, "world");
         int count = 0;
         for(int i=0; i<100; i++){
-                thread_id[i] = thread_create(&threads[i], &do_something, CLONE_VM, arg1, arg2);
+                thread_id[i] = thread_create(&threads[i], &do_something, CLONE_VM | CLONE_THREAD, arg1, arg2);
                 if (thread_id[i] == -1){
                         // printf(2,"%d\n", thread_id[i]);
                         printf(2,"Clone Failed\n");
@@ -318,7 +318,7 @@ void forkInClone(){
         struct pthread thread;
         int arg1 = 10;
         int arg2 = 20;
-        int thread_id = thread_create(&thread, &fork_test, CLONE_VM, (void *)arg1, (void *)arg2);
+        int thread_id = thread_create(&thread, &fork_test, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
         if (thread_id == -1){
                 printf(2,"%d\n", thread_id);
                 printf(2,"Clone Failed");
@@ -335,7 +335,7 @@ void forkInClone(){
 void clone_test(void *arg1, void *arg2){
         struct pthread thread;
         printf(1, "In clone test, ThreadId: %d\n", gettid());
-        int thread_id = thread_create(&thread, &do_something, CLONE_VM, arg1, arg2);
+        int thread_id = thread_create(&thread, &do_something, CLONE_VM | CLONE_THREAD, arg1, arg2);
         sleep(2);
         if(thread_join(&thread) != thread_id){
                 printf(2, "Nested test failed\n");
@@ -350,7 +350,7 @@ void doubleClone(){
         struct pthread thread;
         int arg1 = 10;
         int arg2 = 20;
-        int thread_id = thread_create(&thread, &clone_test, CLONE_VM, (void *)arg1, (void *)arg2);
+        int thread_id = thread_create(&thread, &clone_test, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
         if (thread_id == -1){
                 printf(2,"%d\n", thread_id);
                 printf(2,"Clone Failed");
@@ -376,7 +376,7 @@ void stacktest(){
                 printf(2,"Stack test failed");
                 exit();
         }
-        int thread_id = clone(&do_something, stack, CLONE_VM, (void *)arg1, (void *)arg2);
+        int thread_id = clone(&do_something, stack, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
         if (thread_id == -1){
                 printf(2,"%d\n", thread_id);
                 printf(2,"Clone Failed");
@@ -389,8 +389,15 @@ void stacktest(){
 }
 
 void func_tgkill(void *arg1, void *arg2){
-        
-        sleep(2);
+        printf(1, "Before calling tgkill\n");
+        int tgid = getpid();
+        int tid = gettid();
+        if(tgkill(tgid, tid, 0) == -1)
+                printf(2, "tgkill test failed\n");
+
+
+        printf(1, "After calling tgkill\n");
+
         exit();
 }
 
@@ -402,21 +409,17 @@ void tgkilltest(){
         void *stack;
         stack =  malloc(4096);
         if(!stack) {
-                printf(2,"Malloc Failed");
+              
+        printf(2,"Malloc Failed");
                 exit();
         }
-        int thread_id = clone(&func_tgkill, stack, 0, (void *)arg1, (void *)arg2);
+        int thread_id = clone(&func_tgkill, stack,CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
         if (thread_id == -1){
                 printf(2,"Clone Failed");
                 exit(); 
         }
-        sleep(5);
-        int tgid = getpid();
-       
-        if(tgkill(tgid, thread_id, 0) == -1)
-                printf(2, "tgkill test failed\n");
-
-        join(thread_id);
+        sleep(5);       
+        // join(thread_id);
         printf(1, "tgkill test passed\n");
 
 
@@ -427,7 +430,7 @@ char *heap;
 
 void vm_func(void *arg1, void*arg2)
 {
-	
+
 	printf(1, "Child sees global value = %d\n", global_value);
 	global_value = 10;
 	strcpy(heap, "bye");
@@ -456,7 +459,7 @@ void vmflagtest(){
 	strcpy(buf, "Hello from Parent");
 	strcpy(heap, "Hey");
 	global_value = 5;
-        int pid = clone(&vm_func, stack, CLONE_VM, (void *)buf, (void *)arg2);
+        int pid = clone(&vm_func, stack, CLONE_VM | CLONE_THREAD, (void *)buf, (void *)arg2);
 	if ( pid== -1) {
                 printf(2,"Clone Failed");
 		exit();
@@ -465,7 +468,6 @@ void vmflagtest(){
         join(pid);
 
 	printf(1, "global_value=%d\n", global_value);
-
         printf(1, "VM Flag test passed\n");
 
 
@@ -497,7 +499,7 @@ void filesflagtest(){
 		exit();
 	}
 
-        int pid = clone(&files_func, stack, CLONE_VM | CLONE_FILES, (void *)buf, (void *)arg2);
+        int pid = clone(&files_func, stack, CLONE_VM | CLONE_FILES | CLONE_THREAD, (void *)buf, (void *)arg2);
 	if ( pid== -1) {
                 printf(2,"Clone Failed");
 		exit();
@@ -518,10 +520,67 @@ void filesflagtest(){
 
 }
 
+void parent_fn(void *arg1, void *arg2)
+{
+        exit();
+}
+void parentFlagtest(){
+        printf(1, "Parent Flag Test starting\n");
+        int arg1 = 10;
+        int arg2 = 20;
+        void *stack;
+        stack =  malloc(4096);
+        if(!stack) {
+                printf(2,"Malloc Failed");
+                printf(2,"Parent Flag test failed");
+                exit();
+        }
+        int thread_id = clone(&parent_fn, stack, CLONE_VM | CLONE_PARENT | CLONE_THREAD, (void *)arg1, (void *)arg2);
+        if (thread_id == -1){
+                printf(2,"%d\n", thread_id);
+                printf(2,"Clone Failed");
+                printf(2,"Parent Flag test failed");
+                exit(); 
+        }
+        sleep(1);
+        join(thread_id);
+        printf(1, "Parent Flag test passed\n");
+}
+
+void thread_fcn(void *arg1, void *arg2)
+{
+        int pid = getpid();
+        printf(1, "thread group id : %d\n", pid);
+        exit();
+}
+void threadFlagTest(){
+        printf(1, "Thread Flag Test starting\n");
+        int arg1 = 10;
+        int arg2 = 20;
+        void *stack;
+        stack =  malloc(4096);
+        if(!stack) {
+                printf(2,"Malloc Failed");
+                printf(2,"Thread Flag test failed");
+                exit();
+        }
+        int thread_id = clone(&thread_fcn, stack, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
+        if (thread_id == -1){
+                printf(2,"%d\n", thread_id);
+                printf(2,"Clone Failed");
+                printf(2,"Thread Flag test failed");
+                exit(); 
+        }
+        sleep(1);
+        join(thread_id);
+        printf(1, "Thread Flag test passed\n");
+}
+
 
 int main(int argc, char *argv[]) {
         printf(1, "Clone test starting\n");
         
+        threadFlagTest();
         jointest();
         doubleClone();
         stacktest();
@@ -535,8 +594,8 @@ int main(int argc, char *argv[]) {
         tgkilltest();
         vmflagtest();
         // filesflagtest();
+        parentFlagtest();
 
-        
         printf(1, "Clone test OK\n");
 
         exit();
