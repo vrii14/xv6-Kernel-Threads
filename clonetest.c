@@ -576,6 +576,28 @@ void threadFlagTest(){
         printf(1, "Thread Flag test passed\n");
 }
 
+void killTest(){
+        printf(1, "Kill test starting\n");
+        struct pthread threads[3] ;
+        int thread_id[3];
+        void *arg1 = malloc(1024);
+        void *arg2 = malloc(1024);
+        strcpy(arg1, "hello");
+        strcpy(arg2, "world");
+        // int flag = 0;
+        for(int i=0; i<3; i++){
+                thread_id[i] = thread_create(&threads[i] , &do_something, CLONE_VM | CLONE_THREAD, arg1, arg2);
+                if (thread_id[i] == -1){
+                        printf(2,"%d\n", thread_id[i]);
+                        printf(2,"Clone Failed");
+                        printf(2,"Kill test failed");
+                        exit(); 
+                }
+                sleep(1);
+        }
+        kill(getpid());
+        printf(1, "Kill test passed\n");
+}
 
 int main(int argc, char *argv[]) {
         printf(1, "Clone test starting\n");
@@ -593,6 +615,7 @@ int main(int argc, char *argv[]) {
         stresstesttwo();
         tgkilltest();
         vmflagtest();
+        killTest();
         // filesflagtest();
         parentFlagtest();
 
