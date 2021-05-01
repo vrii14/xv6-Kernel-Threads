@@ -273,14 +273,14 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   }
 
   th->cwd = idup(parentproc->cwd);
-  
+  // th->cwd = parentproc->cwd;
   safestrcpy(th->name, parentproc->name, sizeof(parentproc->name));
   
   pid = th->pid;
   
-  // acquire(&ptable.lock);
+  acquire(&ptable.lock);
   th->state = RUNNABLE;
-  // release(&ptable.lock);
+  release(&ptable.lock);
   
   th->isThread = 1;
 
@@ -328,12 +328,11 @@ int join(int threadId)
           p->name[0] = 0;
           p->killed = 0;
           p->state = UNUSED;
+          release(&ptable.lock);
           //for gettid()
           nextthread_id--;
           curproc->thread_count--;
           // cprintf("If zombie: %d\n", nextthread_id);
-
-          release(&ptable.lock);
           return pid;
         }
       }
@@ -668,14 +667,13 @@ kill(int pid)
         for(int i = 1; i <= p->thread_count; i++){
           tgkill(pid, i, 0);
         }
-      }else{
-        p->killed = 1;
-        // Wake process from sleep if necessary.
-        if(p->state == SLEEPING)
-          p->state = RUNNABLE;
-        release(&ptable.lock);
-        return 0;
       }
+      p->killed = 1;
+      // Wake process from sleep if necessary.
+      if(p->state == SLEEPING)
+        p->state = RUNNABLE;
+      release(&ptable.lock);
+      return 0;
     }
   }
   release(&ptable.lock);

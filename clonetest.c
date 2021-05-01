@@ -234,6 +234,50 @@ void concurrencyTest(){
         printf(1, "Concurrency test passed\n");
 }
 
+long c =0 , c1 = 0, c2 = 0, run = 1;
+void syncFnOne(void *arg1, void*arg2){
+        while(run == 1){
+                c++;
+                c1++;
+        }
+        exit();
+}
+
+void syncFnTwo(void *arg1, void*arg2){
+        while(run == 1){
+                c++;
+                c2++;
+        }
+        exit();
+}
+
+void syncTest(){
+        printf(1, "Synch Test starting\n");
+        struct pthread threads[2];
+        int thread_id[2];
+        int arg1 = 200;
+        int arg2 = 50;
+        // int flag = 0;
+        thread_id[0] = thread_create(&threads[0], &syncFnOne, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
+        thread_id[1] = thread_create(&threads[1], &syncFnTwo, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
+
+        if ((thread_id[0] == -1) || (thread_id[1] == -1)){
+                printf(2,"Clone Failed");
+                printf(2,"Synch test failed");
+                exit(); 
+        }
+        sleep(2);
+        run = 0;
+        for(int i = 0; i<2; i++){
+                if(thread_join(&threads[i]) != thread_id[i]){
+                        printf(2, "Synch test failed\n");
+                        exit();
+                }
+        }
+        printf(1, "c: %ld c1+c2: %ld c1: %ld c2: %ld\n", c, c1+c2, c1, c2);
+        printf(1, "Synch test passed\n");
+}
+
 void stresstestone(){
         printf(1, "Stress test one starting\n");
         struct pthread threads[MAXTHREADS] ;
@@ -615,9 +659,10 @@ int main(int argc, char *argv[]) {
         stresstesttwo();
         tgkilltest();
         vmflagtest();
-        killTest();
+        // killTest();
         // filesflagtest();
         parentFlagtest();
+        // syncTest();
 
         printf(1, "Clone test OK\n");
 
