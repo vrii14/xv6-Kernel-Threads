@@ -1,3 +1,9 @@
+#define MAXTHREADS 60
+#define CLONE_VM 2
+#define CLONE_FILES 4
+#define CLONE_FS 8
+#define CLONE_PARENT 16
+#define CLONE_THREAD 32
 struct stat;
 struct rtcdate;
 
@@ -41,3 +47,18 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+struct pthread
+{
+    uint threadId;
+    void *stack;
+};
+int thread_create(struct pthread *, void (*)(void *, void *), int, void *, void *);
+int thread_join(struct pthread *);
+
+struct t_lock{
+    uint ticket;
+};
+
+void tlock_init(struct t_lock *);
+void tlock_acquire( struct t_lock *);
+void tlock_release(struct t_lock *);
