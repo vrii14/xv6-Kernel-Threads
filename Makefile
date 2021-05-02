@@ -194,6 +194,10 @@ clean:
 	xv6memfs.img mkfs .gdbinit \
 	$(UPROGS)
 
+run:
+	chmod +x test.sh
+	./test.sh
+
 # make a printout
 FILES = $(shell grep -v '^\#' runoff.list)
 PRINT = runoff.list runoff.spec README toc.hdr toc.ftr $(FILES)
