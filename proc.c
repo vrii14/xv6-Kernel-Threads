@@ -187,19 +187,19 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   if((th = allocproc()) == 0) {
     return -1;
   }
-
+  //maxthreads reached
   if(parentproc->thread_count > MAXTHREADS){
     return -1;
   }
+  //stack is not page aligned
   if(((int)stack % PGSIZE) != 0){
     stack = (void*)PGROUNDDOWN((uint)stack);
   } 
 
-
   th->thread_id = ++nextthread_id;
 
   //Thread group id of child will be parent process pid
-  // th->tgid = parentproc->pid;
+  // if clone_thread flag is set
   if(flags & CLONE_THREAD){
     th->tgid = parentproc->pid;
     th->threadFlag = 1;
@@ -209,7 +209,7 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   }
 
   //thread will have same address space as process
-
+  //if clone_vm flag is set 
   if(flags & CLONE_VM){
     th->vmFlag = 1;
     th->pgdir = parentproc->pgdir;
@@ -221,7 +221,8 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
       return -1;
     }
   }
-
+  //if clone_parent flag is set the the parent of thread 
+  //is parent of parent process
   if(flags & CLONE_PARENT){
     th->parentFlag = 1;
     th->parent = parentproc->parent;
@@ -229,8 +230,8 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
     th->parent = parentproc; 
   }
 
+  //user stack array for arguments to thread function
   int user_stack[3];
-
   uint stack_pointer = (uint)stack + PGSIZE;
   user_stack[0] = 0xffffffff;
   user_stack[1] = (uint)arg1;
@@ -238,15 +239,9 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   stack_pointer -= 12;
 
   if (copyout(th->pgdir, stack_pointer, user_stack, 12) < 0)
-  return -1;
+    return -1;
 
   th->sz = parentproc->sz;
-  //parent of thread 
-  // th->parent = parentproc;
-
-
-  //threads list and thread count of parent process updated 
-  //parentproc->procThreads[parentproc->thread_count++] = th;
   //trapframe will be the same
   *th->tf = *parentproc->tf;
   parentproc->thread_count++;
@@ -257,7 +252,6 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   //thread will start from the function provided in the argument of clone
   th->tf->eip = (uint)fcn;
   th->ustack = stack;
-  
 
   //Below Code is borrowed from code of fork()
   //duplicate all the files from the parent process
@@ -293,10 +287,6 @@ int join(int threadId)
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();  
-  // cprintf("threadcount: %d\n", curproc->thread_count);
-  // cprintf("threadid: %d\n", curproc->thread_id);
-  // cprintf("id: %d\n", threadId);
-
   acquire(&ptable.lock);
   for(;;){
     havekids = 0;
@@ -310,14 +300,12 @@ int join(int threadId)
           if(p->parent != curproc)
             continue;
         }
-      
         havekids = 1;
         if(p->state == ZOMBIE && p->pid == threadId){
           // Found one.
           pid = p->pid;
           kfree(p->kstack);
           p->kstack = 0;
-          //freevm(p->pgdir);
           //Can't free the pgdir since it shares it 
           //with the parent proccess. 
           //Just have to make the child pgdir to null
@@ -332,7 +320,6 @@ int join(int threadId)
           //for gettid()
           nextthread_id--;
           curproc->thread_count--;
-          // cprintf("If zombie: %d\n", nextthread_id);
           return pid;
         }
       }
@@ -664,10 +651,13 @@ kill(int pid)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
       if(p->thread_count > 0){
+        //kill all the threads of the parent proccess 
+        //as suggested by tgkill man page
         for(int i = 1; i <= p->thread_count; i++){
           tgkill(pid, i, 0);
         }
       }
+      //kill the proccess too
       p->killed = 1;
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
@@ -680,7 +670,9 @@ kill(int pid)
   return -1;
 }
 
-
+//kill the thread from thread group with thread group id as tgid
+//and thread id as tid
+//did not handle signals
 int tgkill(int tgid, int tid, int sig){
   struct proc *p; 
 

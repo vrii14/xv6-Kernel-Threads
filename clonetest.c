@@ -246,7 +246,7 @@ void syncTest(){
 // lock test thread 
 void lockfn(void *arg1, void *arg2){
         tlock_acquire(&lock);
-        printf(1, "tid: %d\n", gettid());
+        printf(1, "tgid: %d\n", getpid());
         tlock_release(&lock);
         exit();
 }
@@ -376,12 +376,10 @@ void fork_test(void *arg1, void *arg2){
                 printf(2,"Fork Clone test failed");
         }
         if(pid == 0){
-                // printf(1, "In child process, pid: %d\n", pid);
-                // sleep(5);
                 char *execargs[] = {"ls", 0};
                 exec("ls", execargs);
+                printf(1, "in child\n");
         }else{
-                // printf(1, "In parent process, pid: %d\n", pid);
                 wait();
         }
         exit();
@@ -494,55 +492,10 @@ void tgkilltest(){
                 flag = 1;
         }
         if(flag == 0){
-                sleep(5);       
+                sleep(5);  
+                join(thread_id);     
                 printf(1, "tgkill test passed\n");
         }
-       
-}
-
-void files_func(void *arg1, void *arg2)
-{
-	close(fd2);
-        exit();
-}
-
-void filesflagtest(){
-        printf(1, "Files Flag test starting\n");
-
-        char *stack = malloc(4096);
-	char buf[256];
-        int arg2 = 20;
-        int status;
-
-	fd2 = open("README", O_RDWR);
-	if (fd2 == -1) {
-                printf(2,"Open Failed");
-		exit();
-	}
-	if (!stack) {
-                printf(2,"Malloc Failed");
-		exit();
-	}
-
-        int pid = clone(&files_func, stack, CLONE_VM | CLONE_FILES | CLONE_THREAD, (void *)buf, (void *)arg2);
-	if ( pid== -1) {
-                printf(2,"Clone Failed");
-		exit();
-	}
-
-        join(pid);
-
-	status = read(fd2, buf, 5);
-	if (status < 0) {
-                printf(2,"Read Failed");
-                printf(1, "Files Flag test passed\n");
-		exit();
-	}
-	printf(1, "Parent read:%s\n", buf);
-	close(fd2);
-
-        printf(1, "Files Flag test passed\n");
-
 }
 
 void parent_fn(void *arg1, void *arg2)
@@ -623,7 +576,6 @@ int main(int argc, char *argv[]) {
         stresstesttwo();
         locktest();
         tgkilltest();
-        // filesflagtest();
         parentFlagtest();
 
         printf(1, "Clone test OK\n");

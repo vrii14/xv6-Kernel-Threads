@@ -14,6 +14,10 @@ char name[3];
 char *echoargv[] = { "echo", "ALL", "TESTS", "PASSED", 0 };
 int stdout = 1;
 
+struct t_lock lock;
+void tinit(){
+        tlock_init(&lock);
+}
 // does chdir() call iput(p->cwd) in a transaction?
 void
 
@@ -1749,32 +1753,35 @@ rand()
 
 //join test thread
 void clonetest(void *arg1, void *arg2){
-        printf(1, "ThreadId: %d\n", gettid());
-        exit();
+                  tlock_acquire(&lock);
+
+  printf(1, "thread id: %d\n", gettid());
+                tlock_release(&lock);
+
+  exit();
 }
 void clone_testing(){
-        printf(1, "Clone test starting\n");
-        struct pthread threads[12] ;
-        int thread_id[12];
-        void *arg1 = malloc(1024);
-        void *arg2 = malloc(1024);
-        strcpy(arg1, "hello");
-        strcpy(arg2, "world");
-        for(int i=0; i<12; i++){
-                thread_id[i] = thread_create(&threads[i] , &clonetest, CLONE_VM | CLONE_THREAD, arg1, arg2);
-                if (thread_id[i] == -1){
-                        printf(2,"%d\n", thread_id[i]);
-                        printf(2,"Clone Failed");
-                        printf(2,"Clone test failed");
-                }
-                sleep(5);
-        }
-        for(int i=0;i<12;i++){
-                if(thread_join(&threads[i]) != thread_id[i]){
-                        printf(2, "Clone test failed\n");
-                }
-        }
-        printf(1, "Clone test passed\n");
+  printf(1, "Clone test starting\n");
+  struct pthread threads[12] ;
+  int thread_id[12];
+  void *arg1 = malloc(1024);
+  void *arg2 = malloc(1024);
+  strcpy(arg1, "hello");
+  strcpy(arg2, "world");
+  for(int i=0; i<12; i++){
+    thread_id[i] = thread_create(&threads[i] , &clonetest, CLONE_VM, arg1, arg2);
+    if (thread_id[i] == -1){
+      printf(2,"%d\n", thread_id[i]);
+      printf(2,"Clone Failed");
+      printf(2,"Clone test failed");
+    }
+  }
+  for(int i=0;i<12;i++){
+    if(thread_join(&threads[i]) != thread_id[i]){
+      printf(2, "Clone test failed\n");
+    }
+  }
+  printf(1, "Clone test passed\n");
 }
 
 int
@@ -1788,14 +1795,14 @@ main(int argc, char *argv[])
   }
   close(open("usertests.ran", O_CREATE));
 
-  clone_testing();
-
   argptest();
   createdelete();
   linkunlink();
   concreate();
   fourfiles();
   sharedfd();
+  tinit();
+  clone_testing();
 
   bigargtest();
   bigwrite();

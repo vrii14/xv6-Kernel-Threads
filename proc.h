@@ -59,14 +59,13 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   uint thread_count;          // total threads of process
-  uint vmFlag;
-  uint fsFlag;
-  uint fileFlag;
-  uint parentFlag;
-  uint threadFlag;
-  //struct proc* procThreads[MAXTHREADS]; //per process threads array
+  uint vmFlag;                //CLONE_VM flag 
+  uint fsFlag;                //CLONE_fs flag 
+  uint fileFlag;              //CLONE_file flag 
+  uint parentFlag;            //CLONE_parent flag 
+  uint threadFlag;            //CLONE_thread flag 
   void* ustack;                 // user stack for the clone system call
-  uint isThread;
+  uint isThread;                //boolean to know if thread
   int thread_id;
 };
 
