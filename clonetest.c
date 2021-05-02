@@ -376,10 +376,12 @@ void fork_test(void *arg1, void *arg2){
                 printf(2,"Fork Clone test failed");
         }
         if(pid == 0){
-                printf(1, "In child process, pid: %d\n", pid);
-                sleep(5);
+                // printf(1, "In child process, pid: %d\n", pid);
+                // sleep(5);
+                char *execargs[] = {"ls", 0};
+                exec("ls", execargs);
         }else{
-                printf(1, "In parent process, pid: %d\n", pid);
+                // printf(1, "In parent process, pid: %d\n", pid);
                 wait();
         }
         exit();
