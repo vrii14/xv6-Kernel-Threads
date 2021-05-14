@@ -197,39 +197,38 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   } 
 
   th->thread_id = ++nextthread_id;
-
-  //Thread group id of child will be parent process pid
-  // if clone_thread flag is set
-  if(flags & CLONE_THREAD){
-    th->tgid = parentproc->pid;
-    th->threadFlag = 1;
-  }
-  else{
-    th->tgid = th->thread_id;
-  }
+  th->flags = flags;
 
   //thread will have same address space as process
   //if clone_vm flag is set 
   if(flags & CLONE_VM){
-    th->vmFlag = 1;
     th->pgdir = parentproc->pgdir;
   }else{
     if((th->pgdir = copyuvm(parentproc->pgdir, parentproc->sz)) == 0){
       kfree(th->kstack);
       th->kstack = 0;
       th->state = UNUSED;
+      nextthread_id--;
+      th->flags = 0;
       return -1;
     }
   }
   //if clone_parent flag is set the the parent of thread 
   //is parent of parent process
   if(flags & CLONE_PARENT){
-    th->parentFlag = 1;
     th->parent = parentproc->parent;
   }else{
     th->parent = parentproc; 
   }
 
+  //Thread group id of child will be parent process pid
+  // if clone_thread flag is set
+  if(flags & CLONE_THREAD){
+    th->tgid = th->parent->pid;
+  }
+  else{
+    th->tgid = th->thread_id;
+  }
   //user stack array for arguments to thread function
   int user_stack[3];
   uint stack_pointer = (uint)stack + PGSIZE;
@@ -238,8 +237,16 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   user_stack[2] = (uint)arg2;
   stack_pointer -= 12;
 
-  if (copyout(th->pgdir, stack_pointer, user_stack, 12) < 0)
+  if (copyout(th->pgdir, stack_pointer, user_stack, 12) < 0){
+    kfree(th->kstack);
+    th->kstack = 0;
+    th->state = UNUSED;
+    nextthread_id--;
+    th->flags = 0;
+    th->pgdir = 0;
+
     return -1;
+  }
 
   th->sz = parentproc->sz;
   //trapframe will be the same
@@ -258,7 +265,6 @@ int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *
   for(i = 0; i < NOFILE; i++){
     if(parentproc->ofile[i]){
       if(flags & CLONE_FILES){
-        th->fileFlag = 1;
         th->ofile[i] = parentproc->ofile[i];
       }else{
         th->ofile[i] = filedup(parentproc->ofile[i]);        
@@ -293,7 +299,7 @@ int join(int threadId)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       //Only threads have to wait
       if(p->isThread){
-        if(p->parentFlag){
+        if(p->flags & CLONE_PARENT){
           if(p->parent != curproc->parent)
             continue;
         }else{
@@ -309,7 +315,11 @@ int join(int threadId)
           //Can't free the pgdir since it shares it 
           //with the parent proccess. 
           //Just have to make the child pgdir to null
-          p->pgdir = 0;
+          if(p->flags & CLONE_VM){
+            p->pgdir = 0;
+          }else{
+            freevm(p->pgdir);
+          }
           p->pid = 0;
           p->ustack = 0;
           p->parent = 0;
@@ -402,6 +412,9 @@ exit(void)
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
     if(curproc->ofile[fd]){
+      if(curproc->isThread && (curproc->flags & CLONE_FILES)){
+        break;
+      }
       fileclose(curproc->ofile[fd]);
       curproc->ofile[fd] = 0;
     }

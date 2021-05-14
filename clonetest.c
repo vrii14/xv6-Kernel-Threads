@@ -15,11 +15,11 @@ void tinit(){
 }
 int c =0 , c1 = 0, c2 = 0, run = 1;
 int fd2;
-int flag = 0;
 int matA[3][3] = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
 int matB[3][3] = {{10, 11, 12}, {13, 14, 15}, {16, 17, 18}};
 int matC[3][3];
-
+int expectedMat[3][3] ={{84 , 90 , 96 }, {201 , 216 , 231}, {318 , 342 , 366}};
+int global = 10;
 //thread for matrix multiplication
 void matrixThread(void *arg1, void *arg2){
         int *num = (int *)arg2;
@@ -54,6 +54,8 @@ void matrixMultiplication(){
         struct pthread threads[3] ;
         int thread_id[3];
         int arg1 = 10;
+        int failed = 0;
+        int flag = 0;
         for(int i=0; i<3; i++){
                 thread_id[i] = thread_create(&threads[i] , &matrixThread, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)&i);
                 if (thread_id[i] == -1){
@@ -69,16 +71,23 @@ void matrixMultiplication(){
                         if(thread_join(&threads[i]) != thread_id[i]){
                                 printf(2, "Matrix Multiplication test failed\n");
                         }
-                }
+                } 
                 for (int i = 0; i < 3; i++)
                 {
                         for (int j = 0; j < 3; j++)
                         {
                                 printf(1, "%d  ", matC[i][j]);
+                                if(matC[i][j] != expectedMat[i][j]){
+                                        failed = 1;
+                                }
                         }
                         printf(1, "\n");
                 }
-                printf(1, "Matrix Multiplication test passed\n");
+                if(!failed){
+                        printf(1, "Matrix Multiplication test passed\n");
+                }else{
+                        printf(2, "Matrix Multiplication test failed\n");
+                }
         }
 }
 //demo thread
@@ -102,7 +111,7 @@ void jointest(){
         void *arg2 = malloc(1024);
         strcpy(arg1, "hello");
         strcpy(arg2, "world");
-        // int flag = 0;
+        int flag = 0;
         for(int i=0; i<3; i++){
                 thread_id[i] = thread_create(&threads[i] , &join_test, CLONE_VM | CLONE_THREAD, arg1, arg2);
                 if (thread_id[i] == -1){
@@ -140,6 +149,8 @@ void swaptest(){
         struct pthread thread;
         int arg1 = 10;
         int arg2 = 20;
+        int flag = 0;
+
         printf(1,"In swap test before thread, arg1: %d, arg2: %d\n", arg1, arg2);
         int thread_id = thread_create(&thread, &swapTestfn, CLONE_VM | CLONE_THREAD, (void *)&arg1, (void *)&arg2);
         if (thread_id == -1){
@@ -154,7 +165,11 @@ void swaptest(){
                         printf(2, "Swap test failed\n");
                 }
                 printf(1,"In swap test after thread, arg1: %d, arg2: %d\n", arg1, arg2);
-                printf(1, "Swap test passed\n");
+                if(arg1 == 20 && arg2 == 10){
+                        printf(1, "Swap test passed\n");
+                }else{
+                        printf(2, "Swap test failed\n");
+                }
         }
 }
 //sleeping amount 200msec
@@ -177,6 +192,8 @@ void concurrencyTest(){
         int thread_id[2];
         int arg1 = 200;
         int arg2 = 50;
+        int flag = 0;
+
         thread_id[0] = thread_create(&threads[0], &concurrentFnOne, CLONE_VM | CLONE_THREAD, (void *)&arg1, (void *)&arg2);
         thread_id[1] = thread_create(&threads[1], &concurrentFnTwo, CLONE_VM | CLONE_THREAD, (void *)&arg1, (void *)&arg2);
 
@@ -223,6 +240,8 @@ void syncTest(){
         int thread_id[2];
         int arg1 = 200;
         int arg2 = 50;
+        int flag = 0;
+
         thread_id[0] = thread_create(&threads[0], &syncFnOne, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
         thread_id[1] = thread_create(&threads[1], &syncFnTwo, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
 
@@ -240,7 +259,11 @@ void syncTest(){
                         }
                 }
                 printf(1, "c: %d c1+c2: %d c1: %d c2: %d\n", c, c1+c2, c1, c2);
-                printf(1, "Synch test passed\n");
+                if(c == c1+c2){
+                        printf(1, "Synch test passed\n");
+                }else{
+                        printf(2, "Synch test failed\n");
+                }
         }
 }
 // lock test thread 
@@ -258,7 +281,8 @@ void locktest(){
         int thread_id[2];
         int arg1 = 200;
         int arg2 = 200;
-        tlock_init(&lock);
+        int flag = 0;
+
         thread_id[0] = thread_create(&threads[0], &lockfn, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
         thread_id[1] = thread_create(&threads[1], &lockfn, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
 
@@ -287,6 +311,8 @@ void locktwotest(){
         int thread_id[3];
         int arg1 = 200;
         int arg2 = 200;
+        int flag = 0;
+
         for(int i=0; i<3; i++){
                 thread_id[i] = thread_create(&threads[i] , &locktwofn, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
                 if (thread_id[i] == -1){
@@ -305,6 +331,63 @@ void locktwotest(){
                 printf(1, "Lock test Two passed\n");  
         }
 }
+void fileTestFn(void *arg1, void *arg2){
+        int fd = *((int *)arg1);
+        char ch;
+        int n;
+        n = read(fd, &ch, 1);
+        if(n<0){
+                printf(2, "Read error\n");
+        }else{
+                printf(1, "Inside Thread, ch: %c\n", ch);
+        }  
+        // close(fd);
+        sleep(2);
+        exit();
+}
+
+void fileTest(){
+        printf(1, "File test starting\n");
+        int fd;
+        fd = open("README", O_RDONLY);
+       
+        if(fd == -1){
+                printf(2, "Open failed\n Filetest failed.\n");
+                exit();
+        }
+        char ch;
+        int n;
+        n = read(fd, &ch, 1);
+        if(n<0){
+                printf(2, "Read error\n");
+        }else{
+                printf(1, "Before Thread, ch: %c\n", ch);
+        }   
+        struct pthread thread;
+        int arg1 = fd;
+        int arg2 = 20;
+        // int flag = 0;
+        int thread_id = thread_create(&thread, &fileTestFn, CLONE_VM | CLONE_FILES , (void *)&arg1, (void *)arg2);
+        if (thread_id == -1){
+                printf(2,"%d\n", thread_id);
+                printf(2,"Clone Failed");
+                printf(2,"File test failed");
+                exit(); 
+        }
+        sleep(5);
+        if(thread_join(&thread) != thread_id){
+                printf(2, "File test failed\n");
+                exit();
+        }
+        // n = 
+        if(read(fd, &ch, 1)<0){
+                printf(2, "Read error\n");
+        }else{
+                printf(1, "After thread: ch: %c\n", ch);
+                printf(1, "File Test passed.\n");
+        }     
+}
+
 //Stress Test One creating maximum threads without exhaustion of kernel
 void stresstestone(){
         printf(1, "Stress test one starting\n");
@@ -314,6 +397,8 @@ void stresstestone(){
         void *arg2 = malloc(1024);
         strcpy(arg1, "hello");
         strcpy(arg2, "world");
+        int flag = 0;
+
         int num = MAXTHREADS;
         for(int i=0; i<num; i++){
                 thread_id[i] = thread_create(&threads[i], &do_something, CLONE_VM | CLONE_THREAD, arg1, arg2);
@@ -390,6 +475,8 @@ void forkInClone(){
         struct pthread thread;
         int arg1 = 10;
         int arg2 = 20;
+        int flag = 0;
+
         int thread_id = thread_create(&thread, &fork_test, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
         if (thread_id == -1){
                 printf(2,"%d\n", thread_id);
@@ -424,6 +511,8 @@ void doubleClone(){
         struct pthread thread;
         int arg1 = 10;
         int arg2 = 20;
+        int flag = 0;
+
         int thread_id = thread_create(&thread, &clone_test, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
         if (thread_id == -1){
                 printf(2,"%d\n", thread_id);
@@ -446,8 +535,10 @@ void stacktest(){
         int arg2 = 20;
         void *stack;
         stack =  malloc(2000);
+        int flag = 0;
         if(!stack) {
                 printf(2,"Malloc Failed");
+                flag = 1;
                 printf(2,"Stack test failed");
         }
         int thread_id = clone(&do_something, stack, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
@@ -460,6 +551,7 @@ void stacktest(){
         if(flag == 0){
                 sleep(2);
                 join(thread_id);
+                free(stack);
                 printf(1, "Stack test passed\n");
         }
 }
@@ -472,6 +564,7 @@ void func_tgkill(void *arg1, void *arg2){
                 printf(2, "tgkill test failed\n");
 
         printf(1, "After calling tgkill\n");
+        global = 25;
         exit();
 }
 
@@ -483,8 +576,11 @@ void tgkilltest(){
         int arg2 = 20;
         void *stack;
         stack =  malloc(4096);
+        int flag = 0;
+
         if(!stack) {
                 printf(2,"Malloc Failed");
+                flag = 1;
         }
         int thread_id = clone(&func_tgkill, stack,CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
         if (thread_id == -1){
@@ -493,8 +589,13 @@ void tgkilltest(){
         }
         if(flag == 0){
                 sleep(5);  
-                join(thread_id);     
-                printf(1, "tgkill test passed\n");
+                join(thread_id); 
+                free(stack);
+                if(global == 10){
+                        printf(1, "tgkill test passed\n");
+                }else if(global == 25){
+                        printf(2, "tgkill test failed\n");
+                }
         }
 }
 
@@ -509,8 +610,11 @@ void parentFlagtest(){
         int arg2 = 20;
         void *stack;
         stack =  malloc(4096);
+        int flag = 0;
+
         if(!stack) {
                 printf(2,"Malloc Failed");
+                flag = 1;
                 printf(2,"Parent Flag test failed");
         }
         int thread_id = clone(&parent_fn, stack, CLONE_VM | CLONE_PARENT | CLONE_THREAD, (void *)arg1, (void *)arg2);
@@ -523,6 +627,7 @@ void parentFlagtest(){
         if(flag == 0){
                 sleep(1);
                 join(thread_id);
+                free(stack);
                 printf(1, "Parent Flag test passed\n");
         }
 }
@@ -540,8 +645,11 @@ void threadFlagTest(){
         int arg2 = 20;
         void *stack;
         stack =  malloc(4096);
+        int flag = 0;
+
         if(!stack) {
                 printf(2,"Malloc Failed");
+                flag = 1;
                 printf(2,"Thread Flag test failed");
         }
         int thread_id = clone(&thread_fcn, stack, CLONE_VM | CLONE_THREAD, (void *)arg1, (void *)arg2);
@@ -554,6 +662,7 @@ void threadFlagTest(){
         if(flag == 0){
                 sleep(1);
                 join(thread_id);
+                free(stack);
                 printf(1, "Thread Flag test passed\n");       
         }
 }
@@ -562,7 +671,6 @@ int main(int argc, char *argv[]) {
         printf(1, "Clone test starting\n");
         
         tinit();
-        syncTest();
         threadFlagTest();
         jointest();
         doubleClone();
@@ -576,7 +684,9 @@ int main(int argc, char *argv[]) {
         stresstesttwo();
         locktest();
         tgkilltest();
+        fileTest();
         parentFlagtest();
+        syncTest();
 
         printf(1, "Clone test OK\n");
 
