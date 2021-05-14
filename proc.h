@@ -1,3 +1,11 @@
+#define MAXTHREADS 60
+#define CLONE_VM 2
+#define CLONE_FILES 4
+#define CLONE_FS 8
+#define CLONE_PARENT 16
+#define CLONE_THREAD 32
+
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -41,6 +49,7 @@ struct proc {
   char *kstack;                // Bottom of kernel stack for this process
   enum procstate state;        // Process state
   int pid;                     // Process ID
+  int tgid;                    // Thread Group ID
   struct proc *parent;         // Parent process
   struct trapframe *tf;        // Trap frame for current syscall
   struct context *context;     // swtch() here to run process
@@ -49,6 +58,11 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  uint thread_count;          // total threads of process
+  int flags;
+  void* ustack;                 // user stack for the clone system call
+  uint isThread;                //boolean to know if thread
+  int thread_id;
 };
 
 // Process memory is laid out contiguously, low addresses first:
@@ -56,3 +70,4 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+

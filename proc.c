@@ -15,6 +15,7 @@ struct {
 static struct proc *initproc;
 
 int nextpid = 1;
+int nextthread_id = 0;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -111,6 +112,7 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+  p->thread_count = 0;
 
   return p;
 }
@@ -138,6 +140,8 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+  p->tgid = p->pid;
+  p->isThread = 0;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -172,6 +176,172 @@ growproc(int n)
   curproc->sz = sz;
   switchuvm(curproc);
   return 0;
+}
+
+//Clone system call to create a thread of a process which will be called from 
+//user function thread_create 
+int clone(void(*fcn)(void *, void *), void *stack, int flags, void *arg1, void *arg2){
+  int i, pid;
+  struct proc *th;
+  struct proc *parentproc = myproc();
+  if((th = allocproc()) == 0) {
+    return -1;
+  }
+  //maxthreads reached
+  if(parentproc->thread_count > MAXTHREADS){
+    return -1;
+  }
+  //stack is not page aligned
+  if(((int)stack % PGSIZE) != 0){
+    stack = (void*)PGROUNDDOWN((uint)stack);
+  } 
+
+  th->thread_id = ++nextthread_id;
+  th->flags = flags;
+
+  //thread will have same address space as process
+  //if clone_vm flag is set 
+  if(flags & CLONE_VM){
+    th->pgdir = parentproc->pgdir;
+  }else{
+    if((th->pgdir = copyuvm(parentproc->pgdir, parentproc->sz)) == 0){
+      kfree(th->kstack);
+      th->kstack = 0;
+      th->state = UNUSED;
+      nextthread_id--;
+      th->flags = 0;
+      return -1;
+    }
+  }
+  //if clone_parent flag is set the the parent of thread 
+  //is parent of parent process
+  if(flags & CLONE_PARENT){
+    th->parent = parentproc->parent;
+  }else{
+    th->parent = parentproc; 
+  }
+
+  //Thread group id of child will be parent process pid
+  // if clone_thread flag is set
+  if(flags & CLONE_THREAD){
+    th->tgid = th->parent->pid;
+  }
+  else{
+    th->tgid = th->thread_id;
+  }
+  //user stack array for arguments to thread function
+  int user_stack[3];
+  uint stack_pointer = (uint)stack + PGSIZE;
+  user_stack[0] = 0xffffffff;
+  user_stack[1] = (uint)arg1;
+  user_stack[2] = (uint)arg2;
+  stack_pointer -= 12;
+
+  if (copyout(th->pgdir, stack_pointer, user_stack, 12) < 0){
+    kfree(th->kstack);
+    th->kstack = 0;
+    th->state = UNUSED;
+    nextthread_id--;
+    th->flags = 0;
+    th->pgdir = 0;
+
+    return -1;
+  }
+
+  th->sz = parentproc->sz;
+  //trapframe will be the same
+  *th->tf = *parentproc->tf;
+  parentproc->thread_count++;
+  //should return 0 on success of thread creation
+  th->tf->eax = 0;
+  th->tf->esp = (uint)stack_pointer;
+  th->tf->ebp = th->tf->esp;
+  //thread will start from the function provided in the argument of clone
+  th->tf->eip = (uint)fcn;
+  th->ustack = stack;
+
+  //Below Code is borrowed from code of fork()
+  //duplicate all the files from the parent process
+  for(i = 0; i < NOFILE; i++){
+    if(parentproc->ofile[i]){
+      if(flags & CLONE_FILES){
+        th->ofile[i] = parentproc->ofile[i];
+      }else{
+        th->ofile[i] = filedup(parentproc->ofile[i]);        
+      }
+    }
+  }
+
+  th->cwd = idup(parentproc->cwd);
+  // th->cwd = parentproc->cwd;
+  safestrcpy(th->name, parentproc->name, sizeof(parentproc->name));
+  
+  pid = th->pid;
+  
+  acquire(&ptable.lock);
+  th->state = RUNNABLE;
+  release(&ptable.lock);
+  
+  th->isThread = 1;
+
+  return pid;
+}
+
+//Borrowed some code from wait system call
+int join(int threadId)
+{
+  struct proc *p;
+  int havekids, pid;
+  struct proc *curproc = myproc();  
+  acquire(&ptable.lock);
+  for(;;){
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      //Only threads have to wait
+      if(p->isThread){
+        if(p->flags & CLONE_PARENT){
+          if(p->parent != curproc->parent)
+            continue;
+        }else{
+          if(p->parent != curproc)
+            continue;
+        }
+        havekids = 1;
+        if(p->state == ZOMBIE && p->pid == threadId){
+          // Found one.
+          pid = p->pid;
+          kfree(p->kstack);
+          p->kstack = 0;
+          //Can't free the pgdir since it shares it 
+          //with the parent proccess. 
+          //Just have to make the child pgdir to null
+          if(p->flags & CLONE_VM){
+            p->pgdir = 0;
+          }else{
+            freevm(p->pgdir);
+          }
+          p->pid = 0;
+          p->ustack = 0;
+          p->parent = 0;
+          p->name[0] = 0;
+          p->killed = 0;
+          p->state = UNUSED;
+          release(&ptable.lock);
+          //for gettid()
+          nextthread_id--;
+          curproc->thread_count--;
+          return pid;
+        }
+      }
+    }
+    // No point waiting if we don't have any children.
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
 }
 
 // Create a new process copying p as the parent.
@@ -212,11 +382,16 @@ fork(void)
 
   pid = np->pid;
 
+  //tgid for gtpid function
+  np->tgid = np->pid;
+
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
 
   release(&ptable.lock);
+
+  np->isThread = 0;
 
   return pid;
 }
@@ -237,6 +412,9 @@ exit(void)
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
     if(curproc->ofile[fd]){
+      if(curproc->isThread && (curproc->flags & CLONE_FILES)){
+        break;
+      }
       fileclose(curproc->ofile[fd]);
       curproc->ofile[fd] = 0;
     }
@@ -284,7 +462,8 @@ wait(void)
       if(p->parent != curproc)
         continue;
       havekids = 1;
-      if(p->state == ZOMBIE){
+      // wait only for processes and not threads 
+      if(p->state == ZOMBIE && !p->isThread){
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
@@ -484,6 +663,14 @@ kill(int pid)
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
+      if(p->thread_count > 0){
+        //kill all the threads of the parent proccess 
+        //as suggested by tgkill man page
+        for(int i = 1; i <= p->thread_count; i++){
+          tgkill(pid, i, 0);
+        }
+      }
+      //kill the proccess too
       p->killed = 1;
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
@@ -494,6 +681,27 @@ kill(int pid)
   }
   release(&ptable.lock);
   return -1;
+}
+
+//kill the thread from thread group with thread group id as tgid
+//and thread id as tid
+//did not handle signals
+int tgkill(int tgid, int tid, int sig){
+  struct proc *p; 
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->thread_id == tid && p->tgid == tgid){
+        p->killed = 1;
+        // Wake process from sleep if necessary.
+        if(p->state == SLEEPING)
+          p->state = RUNNABLE;
+        return 0;
+      }
+    
+  }
+
+  return -1;
+
 }
 
 //PAGEBREAK: 36
@@ -532,3 +740,4 @@ procdump(void)
     cprintf("\n");
   }
 }
+
